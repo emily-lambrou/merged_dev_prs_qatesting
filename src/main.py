@@ -153,6 +153,15 @@ def notify_change_status():
                 
 def main():
     logger.info('Process started...')
+
+    # ───────────────────────────────────────────────────────────────────────────
+    # ONLY proceed when running on the "dev" branch
+    current = config.repository_branch
+    if current != 'dev':
+        logger.info(f'Skipping status updates (running on "{current}" branch).')
+        return
+    # ───────────────────────────────────────────────────────────────────────────
+    
     if config.dry_run:
         logger.info('DRY RUN MODE ON!')
 

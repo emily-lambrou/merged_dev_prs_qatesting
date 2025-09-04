@@ -1,4 +1,3 @@
-# graphql.py
 from pprint import pprint
 import logging
 import requests
@@ -35,9 +34,7 @@ def get_repo_issues(owner, repository, after=None, issues=None):
           pageInfo {
             endCursor
             hasNextPage
-            hasPreviousPage
           }
-          totalCount
         }
       }
     }
@@ -70,7 +67,6 @@ def get_project_issues(owner, owner_type, project_number, status_field_name, fil
         projectV2(number: $projectNumber) {{
           id
           title
-          number
           items(first: 100, after: $after) {{
             nodes {{
               id
@@ -87,33 +83,19 @@ def get_project_issues(owner, owner_type, project_number, status_field_name, fil
                   number
                   state
                   url
-                  assignees(first:20) {{
-                    nodes {{
-                      name
-                      email
-                      login
-                    }}
-                  }}
                 }}
               }}
             }}
             pageInfo {{
               endCursor
               hasNextPage
-              hasPreviousPage
             }}
-            totalCount
           }}
         }}
       }}
     }}
     """
-    variables = {
-        'owner': owner,
-        'projectNumber': project_number,
-        'status': status_field_name,
-        'after': after
-    }
+    variables = {'owner': owner, 'projectNumber': project_number, 'status': status_field_name, 'after': after}
     try:
         response = requests.post(
             config.api_endpoint,
@@ -138,7 +120,6 @@ def get_project_issues(owner, owner_type, project_number, status_field_name, fil
                 if not issue_content:
                     continue
                 if filters.get('open_only') and issue_content.get('state') != 'OPEN':
-                    logging.debug(f"Filtering out issue ID {issue_content.get('id')}")
                     continue
                 filtered.append(node)
             nodes = filtered
@@ -172,13 +153,6 @@ def get_project_items(owner, owner_type, project_number, status_field_name, filt
                   title
                   state
                   url
-                  assignees(first: 10) {{
-                    nodes {{
-                      name
-                      email
-                      login
-                    }}
-                  }}
                 }}
               }}
             }}
@@ -286,7 +260,6 @@ def get_status_field_id(project_id, status_field_name):
         for field in fields:
             if field.get('name') == status_field_name and field['__typename'] == 'ProjectV2SingleSelectField':
                 return field['id']
-        logging.warning(f"Status field '{status_field_name}' not found.")
         return None
     except requests.RequestException as e:
         logging.error(f"Request error: {e}")
@@ -330,13 +303,15 @@ def get_qatesting_status_option_id(project_id, status_field_name):
                 for option in field.get('options', []):
                     if option['name'] == "QA Testing":
                         return option['id']
-        logging.warning(f"Status 'QA Testing' not found.")
         return None
     except requests.RequestException as e:
         logging.error(f"Request error: {e}")
         return None
 
 def get_issue_has_merged_pr(issue_id: str) -> bool:
+    """
+    Returns True if the issue has at least one merged PR whose base branch is 'dev'.
+    """
     query = """
     query GetIssueTimeline($issueId: ID!, $afterCursor: String) {
       node(id: $issueId) {
@@ -366,7 +341,6 @@ def get_issue_has_merged_pr(issue_id: str) -> bool:
     }
     """
     variables = {'issueId': issue_id, 'afterCursor': None}
-
     try:
         while True:
             response = requests.post(

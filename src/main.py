@@ -26,8 +26,7 @@ def notify_change_status():
     else:
         issues = graphql.get_repo_issues(
             owner=config.repository_owner,
-            repository=config.repository_name,
-            status_field_name=config.status_field_name
+            repository=config.repository_name
         )
 
     if not issues:
@@ -38,14 +37,12 @@ def notify_change_status():
     # Get the project_id, status_field_id and status_option_id 
     #----------------------------------------------------------------------------------------
 
-    project_title = 'Test'
+    project_title = config.project_title
     
     project_id = graphql.get_project_id_by_title(
         owner=config.repository_owner, 
         project_title=project_title
     )
-
-    # logger.info(f'Printing the project_id: {project_id}')
 
     if not project_id:
         logging.error(f"Project {project_title} not found.")
@@ -56,8 +53,6 @@ def notify_change_status():
         status_field_name=config.status_field_name
     )
 
-    # logger.info(f"Printing the status_field_id: {status_field_id}")
-
     if not status_field_id:
         logging.error(f"Status field not found in project {project_title}")
         return None
@@ -66,6 +61,10 @@ def notify_change_status():
         project_id=project_id,
         status_field_name=config.status_field_name
     )
+
+    if not status_option_id:
+        logging.error(f"'QA Testing' option not found in project {project_title}")
+        return None
 
     #----------------------------------------------------------------------------------------
 
@@ -76,18 +75,11 @@ def notify_change_status():
         status_field_name=config.status_field_name
     )
 
-    # Log fetched project items
-    # logger.info(f'Fetched project items: {json.dumps(items, indent=4)}')
-
     for issue in issues:
         # Skip the issues if they are closed
         if issue.get('state') == 'CLOSED':
             continue
 
-        # Print the issue object for debugging
-        # print("Issue object: ", json.dumps(issue, indent=4))
-
-        # Ensure the issue contains content
         issue_content = issue.get('content', {})
         if not issue_content:
             continue
@@ -96,41 +88,34 @@ def notify_change_status():
         if not issue_id:
             continue
 
-        # Debugging output for the issue
-        # logger.info("Issue object: %s", json.dumps(issue, indent=4))
-
-        # Safely get the fieldValueByName and current status
+        # Get current status
         field_value = issue.get('fieldValueByName')
         current_status = field_value.get('name') if field_value else None
-        # logger.info(f'The current status of {issue_id} is: {current_status}')
 
         comment_text = "This issue is ready for testing. Please proceed accordingly in 15 minutes."
 
         if current_status == 'QA Testing':
-            continue # skip the issue 
+            continue  # skip if already QA Testing
 
         if check_comment_exists(issue_id, comment_text):
-            continue # skip the issue if it was in QA Testing before (the comment already exists)
-            
+            continue  # skip if comment already exists (previously QA)
+
         issue_title = issue.get('title')
 
-        has_merged_pr = graphql.get_issue_has_merged_pr(issue_id)
-        if has_merged_pr:  
-            
+        # ✅ Check if the issue has a merged PR into dev
+        has_merged_pr_in_dev = graphql.get_issue_has_merged_pr(issue_id)
+        if has_merged_pr_in_dev:  
             print("Issue object: ", json.dumps(issue, indent=4))
+            logger.info(f'Proceeding to update the status to QA Testing as it contains a merged PR into dev.')
 
-            logger.info(f'Proceeding to update the status to QA Testing as it contains a merged PR.')
-
-            # Find the item id for the issue
+            # Find the project item for this issue
             item_found = False
             for item in items:
                 if item.get('content') and item['content'].get('id') == issue_id:
                     item_id = item['id']
-                    
                     item_found = True
                     
-                    # Proceed to update the status
-
+                    # Update the status field
                     update_result = graphql.update_issue_status_to_qa_testing(
                         owner=config.repository_owner,
                         project_title=project_title,
@@ -144,24 +129,14 @@ def notify_change_status():
                         logger.info(f'Successfully updated issue {issue_id} to QA Testing.')
                     else:
                         logger.error(f'Failed to update issue {issue_id}.')
-                    break  # Break out of the loop once updated
+                    break  
 
             if not item_found:
                 logger.warning(f'No matching item found for issue ID: {issue_id}.')
-                continue #  Skip the issue as it cannot be updated
+                continue  
 
-                
 def main():
     logger.info('Process started...')
-
-    # ───────────────────────────────────────────────────────────────────────────
-    # ONLY proceed when running on the "dev" branch
-    current = config.repository_branch
-    if current != 'dev':
-        logger.info(f'Skipping status updates (running on "{current}" branch).')
-        return
-    # ───────────────────────────────────────────────────────────────────────────
-    
     if config.dry_run:
         logger.info('DRY RUN MODE ON!')
 

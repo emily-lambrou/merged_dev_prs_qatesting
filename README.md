@@ -66,7 +66,7 @@ jobs:
           dry_run: ${{ vars.DRY_RUN }}           
           gh_token: ${{ secrets.GH_TOKEN }}      
           project_number: ${{ vars.PROJECT_NUMBER }} 
-          project_title: 'George Test'
+          project_title: 'Test'
           enterprise_github: 'True'
           repository_owner_type: 'organization'
        

@@ -92,7 +92,7 @@ def notify_change_status():
         field_value = issue.get('fieldValueByName')
         current_status = field_value.get('name') if field_value else None
 
-        comment_text = "This issue is ready for testing. Please proceed accordingly in 15 minutes."
+        comment_text = "Testing will be available in 15 minutes."
 
         if current_status == 'QA Testing':
             continue  # skip if already QA Testing
